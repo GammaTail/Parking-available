@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Map</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+
+  <style>
+    #map { height: 400px; }
+  </style>
+
+</head>
+<body>
+
+  <input type="text" id="searchInput" placeholder="Enter a location">
+  <div id="map"></div>
+  <div id="searchResults"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.24.0/axios.min.js"></script>
+
+<script>
+    var map = L.map('map').setView([51.505, -0.09], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    var searchInput = document.getElementById('searchInput');
+    var searchResults = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', function () {
+    var query = searchInput.value.trim();
+
+    if (query.length > 0) {
+        searchLocation(query);
+    } else {
+        searchResults.innerHTML = '';
+    }
+    });
+
+    function searchLocation(query) {
+    var url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json`;
+
+    axios.get(url)
+        .then(response => {
+        if (response.data.length > 0) {
+            var results = response.data;
+            displayResultsList(results);
+        } else {
+            searchResults.innerHTML = '<p>No results found.</p>';
+        }
+        })
+        .catch(error => {
+        console.error('Error fetching data:', error);
+        });
+    }
+
+    function displayResultsList(results) {
+    var listHtml = '<ul>';
+    results.forEach(result => {
+        listHtml += `<li><a href="#" onclick="selectResult('${result.lat}', '${result.lon}', '${result.display_name}')">${result.display_name}</a></li>`;
+    });
+    listHtml += '</ul>';
+
+    searchResults.innerHTML = listHtml;
+    }
+
+    function selectResult(latitude, longitude, displayName) {
+        map.setView([parseFloat(latitude), parseFloat(longitude)], 13);
+        L.marker([parseFloat(latitude), parseFloat(longitude)]).addTo(map)
+            .bindPopup(displayName).openPopup();
+
+        axios.post('/selected-location', {
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
+            displayName: displayName
+        })
+        .then(response => {
+            console.log(response.data);
+            window.location.href = "/locations";
+        })
+        .catch(error => {
+            console.error('Error sending data to backend:', error);
+        });
+    }
+
+    map.locate({ setView: true, maxZoom: 16 });
+
+    function onLocationFound(e) {
+    var radius = e.accuracy;
+
+    L.marker(e.latlng).addTo(map)
+        .bindPopup("You are within " + radius + " meters from this point").openPopup();
+
+    L.circle(e.latlng, radius).addTo(map);
+    }
+
+    map.on('locationfound', onLocationFound);
+
+    function onLocationError(e) {
+        alert(e.message);
+    }
+    map.on('locationerror', onLocationError);
+    
+    // const lati = <%= //lat %>
+    // const lon = <%= //lon %>
+
+    // L.marker([lati,  lon]).addTo(map)
+    //   .bindPopup('<b>Delhi</b><br />Its great')
+    //   .openPopup();
+
+</script>
+</body>
+</html>
